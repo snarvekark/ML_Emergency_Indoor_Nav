@@ -3,6 +3,7 @@ import json
 import networkx as nx
 import numpy as np
 import random
+import sys
    
 
 def next_number(start,er, g, q, r):
@@ -31,26 +32,38 @@ def learn(er,lr,discount, g, q, r):
 
 def shortest_path(begin, end, q):
     path = [begin]
+    print(path)
     next_node = np.argmax(q[begin,])
+    print(next_node)
     path.append(next_node)
+    print(path)
+    print(end)
     while next_node != end:
         next_node = np.argmax(q[next_node,])
+        print(next_node)
         path.append(next_node)
+        print(path)
+    print("Shortest Path done")
     return path
 
 
 def main():
     start_node =int(sys.argv[1])
-    end_node =int(sys.argv[2])
+    end_node =10
     e = [(0,4),(4,0),(0,3),(3,0),(1,2),(2,1),(1,4),(4,1),(1,8),(8,1),(1,9),(9,1),(2,3),(3,2),(2,6),(6,2),(1,5),(5,1),(2,5), (5,2),(5,6),(6,5),(7,8),(8,7),(7,5),(5,7),(8,9),(9,8),(8,10),(10,8),(9,10),(10,9)]
     edges = e
     g = nx.Graph()
+    print("Initial Edge done")
     g.add_edges_from(edges)
     pos = nx.spring_layout(g)
+    # nx.draw_networkx_nodes(g,pos)
+    # nx.draw_networkx_edges(g,pos)
+    # nx.draw_networkx_labels(g,pos)
 
     r = np.matrix(np.zeros(shape = (11,11)))
     for x in g[10]:
         r[x,10] = 100
+    print("R Done")
 
     q = np.matrix(np.zeros(shape = (11,11)))
     q-=100
@@ -58,7 +71,8 @@ def main():
         for x in g[node]:
             q[node,x]=0
             q[x,node]=0
-
+    print("Q Done")
+    learn(0.5,0.8,0.8,g,q,r)
     s_path =shortest_path(start_node, end_node, q)
 
     print(s_path)
