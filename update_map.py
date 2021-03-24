@@ -21,31 +21,66 @@ def lambda_handler(event, context):
     second_node =str(event['second_node'])
     first_node_key = get_node_key(first_node)
     second_node_key = get_node_key(second_node)
-    # Replace the following edge list with list from DB, retrieve list from DB
-    edges = [(9,16),(16,9),(10,17),(17,10),(11,18),(18,11),(16,17),(17,16),(17,18),(18,17),
-         (18,19),(19,18),(19,21),(21,19),(20,21),(21,20),(20,0),(0,20),(21,24),(24,21),
-         (22,24),(24,22),(22,1),(1,22),(24,12),(12,24),(23,24),(24,23),(23,2),(2,23),
-         (24,25),(25,24),(25,13),(13,25),(25,27),(27,25),(27,28),(28,27),(28,3),(3,28),
-         (28,30),(30,28),(30,31),(31,30),(30,29),(29,30),(30,32),(32,30),(29,4),(4,29),
-         (32,33),(33,32),(29,32),(32,29),(33,34),(34,33),(33,5),(5,33),(34,6),(6,34),
-         (32,37),(37,32),(37,36),(36,37),(37,15),(15,37),(36,7),(7,36),(35,8),(8,35),
-         (36,35),(35,36),(27,30),(30,27),(26,27),(27,26),(14,26),(26,14),(0,1),(1,0),
-         (2,38),(38,2),(39,38),(38,39),(12,13),(13,12),(13,14),(14,13),(14,12),(12,14),
-         (3,4),(4,3),(5,6),(6,5),(39,27),(27,39)] 
+    
+    ################# Read the List from DB #########################
+
+    client = boto3.resource('dynamodb')
+    table = client.Table('Edge')
+    response = table.get_item(
+        Key={
+            'edgeId' : 'id001_02'
+        },
+        AttributesToGet=[
+        'mapList'
+    ],
+    )
+    #print(type(response['Item']))
+    result = response['Item']
+    #print(result['mapList'])
+
+    #Convert String List to Tuple
+    edges = list(map(eval, result['mapList']))
+    #print(edges)
+
+    # Original Map
+    # edges = [(9,16),(16,9),(10,17),(17,10),(11,18),(18,11),(16,17),(17,16),(17,18),(18,17),
+    #      (18,19),(19,18),(19,21),(21,19),(20,21),(21,20),(20,0),(0,20),(21,24),(24,21),
+    #      (22,24),(24,22),(22,1),(1,22),(24,12),(12,24),(23,24),(24,23),(23,2),(2,23),
+    #      (24,25),(25,24),(25,13),(13,25),(25,27),(27,25),(27,28),(28,27),(28,3),(3,28),
+    #      (28,30),(30,28),(30,31),(31,30),(30,29),(29,30),(30,32),(32,30),(29,4),(4,29),
+    #      (32,33),(33,32),(29,32),(32,29),(33,34),(34,33),(33,5),(5,33),(34,6),(6,34),
+    #      (32,37),(37,32),(37,36),(36,37),(37,15),(15,37),(36,7),(7,36),(35,8),(8,35),
+    #      (36,35),(35,36),(27,30),(30,27),(26,27),(27,26),(14,26),(26,14),(0,1),(1,0),
+    #      (2,38),(38,2),(39,38),(38,39),(12,13),(13,12),(13,14),(14,13),(14,12),(12,14),
+    #      (3,4),(4,3),(5,6),(6,5),(39,27),(27,39)] 
     
     # Update the connection between the given nodes
-    edges.remove((first_node_key,second_node_key))
-    edges.remove((second_node_key,first_node_key))
-
-    #Save updated edge list in DB
-    #Implement Here
+    res = []
+    try:
+        edges.remove((first_node_key,second_node_key))
+        edges.remove((second_node_key,first_node_key))
+        
+        print("Updated List: ")
+        print(edges)
+    
+        for x in edges:
+            res.append(str(x))
+        print(res)
+    
+        #Save updated edge list in DB
+        responseUpdate = table.update_item(
+            Key={
+                'edgeId' : 'id001_02'
+            },
+            UpdateExpression='SET mapList = :val1',
+            ExpressionAttributeValues={
+                ':val1': res
+            }
+        )
+        # print(edges)
+    except Exception as e:
+        print(e)
 
     return {
-        "statusCode": 200,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": json.dumps({
-            "Updated Map ": str(edges) 
-        })
+        "updatedMap": res
     }
