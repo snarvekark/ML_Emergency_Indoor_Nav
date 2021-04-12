@@ -4,6 +4,9 @@ import networkx as nx
 import numpy as np
 import random
 from boto3.dynamodb.conditions import Key
+import requests
+import json
+from flatten_json import flatten
    
 
 def next_number(start,er, g, q, r):
@@ -46,55 +49,65 @@ def get_shortest_path(origin_iot, q):
                31:'W-16', 32:'W-17', 33:'W-18', 34:'W-19', 35:'W-20', 36:'W-21', 37:'W-22', 38:'R-B2',39:'W-23'}
     res = []
     origin = 0
-    print(origin_iot)
+    #print(origin_iot)
     for key, value in map_names.items():
         if origin_iot == value:
             origin = key
-    print(origin)
+    #print(origin)
     for n in shortest_path(origin,31,q):
          res.append(map_names[n])
     return res
 
+def get_map():
+    url = "https://knaiab6xvbgbngi526537bslgu.appsync-api.us-east-1.amazonaws.com/graphql"
+    query = \
+        """
+        query MyQuery {
+            getBuilding(id: "id001") {
+                edges {
+                    items {
+                        sourceIoT {
+                            number
+                        }
+                        destinationIoT {
+                            number
+                        }
+                        isActive
+                    }
+                }
+            }
+        }
+        """
+
+    payload=json.dumps({"query": query})
+    headers = {
+    'x-api-key': 'da2-bevlp556a5hpzciuumghepwnqy',
+    'Content-Type': 'application/json'
+    }
+
+    response = requests.request("POST", url, headers=headers, data=payload)
+    edgesDb = json.loads(response.text)['data']['getBuilding']['edges']['items']
+    dict_edges = {}
+    for d in edgesDb:
+        if(d['isActive'] == True):
+            dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
+    mapList = [(k, v) for k, v in dict_edges.items()]
+    revMapList = [(v, k) for k, v in dict_edges.items()]
+    edges = mapList + revMapList
+    return edges
+
+
 def lambda_handler(event, context):
     start_node =str(event['start_node'])
 
-    ################# Read the List from DB #########################
+    ################### Read from Edge Table ####################
+    edges = get_map()
 
-    client = boto3.resource('dynamodb')
-    table = client.Table('Edge')
-    response = table.get_item(
-        Key={
-            'edgeId' : 'id001_01'
-        },
-        AttributesToGet=[
-        'mapList'
-    ],
-    )
-    print(type(response['Item']))
-    result = response['Item']
-    print(result['mapList'])
+    #############################################################
 
-    #Convert String List to Tuple
-    edges = list(map(eval, result['mapList']))
-    print(edges)
-
-
-    # edges = [(9,16),(16,9),(10,17),(17,10),(11,18),(18,11),(16,17),(17,16),(17,18),(18,17),
-    #      (18,19),(19,18),(19,21),(21,19),(20,21),(21,20),(20,0),(0,20),(21,24),(24,21),
-    #      (22,24),(24,22),(22,1),(1,22),(24,12),(12,24),(23,24),(24,23),(23,2),(2,23),
-    #      (24,25),(25,24),(25,13),(13,25),(25,27),(27,25),(27,28),(28,27),(28,3),(3,28),
-    #      (28,30),(30,28),(30,31),(31,30),(30,29),(29,30),(30,32),(32,30),(29,4),(4,29),
-    #      (32,33),(33,32),(29,32),(32,29),(33,34),(34,33),(33,5),(5,33),(34,6),(6,34),
-    #      (32,37),(37,32),(37,36),(36,37),(37,15),(15,37),(36,7),(7,36),(35,8),(8,35),
-    #      (36,35),(35,36),(27,30),(30,27),(26,27),(27,26),(14,26),(26,14),(0,1),(1,0),
-    #      (2,38),(38,2),(39,38),(38,39),(12,13),(13,12),(13,14),(14,13),(14,12),(12,14),
-    #      (3,4),(4,3),(5,6),(6,5),(39,27),(27,39)]
     g = nx.Graph()
     g.add_edges_from(edges)
     pos = nx.spring_layout(g)
-    # nx.draw_networkx_nodes(g,pos)
-    # nx.draw_networkx_edges(g,pos)
-    # nx.draw_networkx_labels(g,pos)
 
     # Intitialize Reward Matrix
     r = np.matrix(np.zeros(shape = (40,40)))
