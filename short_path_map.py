@@ -29,34 +29,64 @@ def updateQ(node1,node2,lr,discount, q, r):
 
 def learn(er,lr,discount, g, q, r):
     for i in range(50000):
-        start = np.random.randint(0,40)
-        next_node = next_number(start,er, g, q, r)
-        updateQ(start,next_node,lr,discount, q, r)
+        try:
+            start = np.random.randint(0,40)
+            next_node = next_number(start,er, g, q, r)
+            updateQ(start,next_node,lr,discount, q, r)
+        except:
+            break
 
 def shortest_path(begin, end, q):
-    path = [begin]
-    next_node = np.argmax(q[begin,])
-    path.append(next_node)
-    while next_node != end:
-        next_node = np.argmax(q[next_node,])
-        path.append(next_node)
-    return path
 
-def get_shortest_path(origin_iot, q):
+    path = []
+    msg = False
+    path = [begin]
+    if not np.argmax(q[begin,]):
+        print(path)
+        print(msg)
+        return path, msg
+    else:
+        next_node = np.argmax(q[begin,])
+        path.append(next_node)
+        temp = next_node
+        while next_node != end:
+            next_node = np.argmax(q[next_node,])
+            if next_node == temp:
+                msg = False
+                print(path)
+                print(msg)
+                break
+            path.append(next_node)
+            msg = True
+            print(path)
+            print(msg)
+        return path, msg
+
+
+def get_shortest_path(origin_iot, q, edges):
     map_names = {0:'R-A1',1:'R-A2',2:'R-B1',3:'R-C1', 4:'R-C2',5:'R-D1',6:'R-D2', 7:'R-E1', 8:'R-F1', 9:'R-G1', 10:'R-H1',
                11:'R-I1', 12:'R-M1', 13:'R-M2',14:'R-M3', 15:'R-N1',16:'W-1',17:'W-2', 18:'W-3', 19:'W-4', 20: 'W-5',
                21:'W-6', 22:'W-7', 23:'W-8', 24:'W-9', 25:'W-10', 26:'W-11', 27:'W-12', 28:'W-13', 29:'W-14', 30:'W-15',
                31:'W-16', 32:'W-17', 33:'W-18', 34:'W-19', 35:'W-20', 36:'W-21', 37:'W-22', 38:'R-B2',39:'W-23'}
     res = []
+    spath = []
+    pathFlag = False
     origin = 0
+    keyExist = False
     #print(origin_iot)
     for key, value in map_names.items():
         if origin_iot == value:
             origin = key
     #print(origin)
-    for n in shortest_path(origin,31,q):
-         res.append(map_names[n])
-    return res
+    for key, value in edges:
+        if key == origin:
+            keyExist = True
+    if (keyExist == True):
+        spath, pathFlag = shortest_path(origin,31,q)
+        if(pathFlag == True):
+            for n in spath:
+                res.append(map_names[n])
+    return res, pathFlag
 
 def get_map():
     url = "https://knaiab6xvbgbngi526537bslgu.appsync-api.us-east-1.amazonaws.com/graphql"
@@ -73,6 +103,7 @@ def get_map():
                             number
                         }
                         isActive
+                        canBeDeactivated
                     }
                 }
             }
@@ -87,18 +118,23 @@ def get_map():
 
     response = requests.request("POST", url, headers=headers, data=payload)
     edgesDb = json.loads(response.text)['data']['getBuilding']['edges']['items']
+    print(edgesDb)
     dict_edges = {}
     for d in edgesDb:
-        if(d['isActive'] == True):
+        if(d['isActive'] == False):
             dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
+    print(dict_edges)
     mapList = [(k, v) for k, v in dict_edges.items()]
     revMapList = [(v, k) for k, v in dict_edges.items()]
     edges = mapList + revMapList
+    print(edges)
     return edges
 
 
 def lambda_handler(event, context):
     start_node =str(event['start_node'])
+    s_path = []
+    pFlag = False
 
     ################### Read from Edge Table ####################
     edges = get_map()
@@ -121,11 +157,12 @@ def lambda_handler(event, context):
             q[node,x]=0
             q[x,node]=0
     learn(0.5,0.8,0.8,g,q,r)
-    s_path =get_shortest_path(start_node, q)
-    
-    return {
-       "shortestPath": s_path
-    }
-
-
-
+    s_path, pFlag = get_shortest_path(start_node, q, edges)
+    if (pFlag == True):
+        return {
+            "shortestPath": s_path
+        }
+    else:
+        return {
+            "shortestPath": "Available path is blocked. Please wait for first responders to assist."
+        }
