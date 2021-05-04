@@ -130,11 +130,27 @@ def get_map():
     print(edges)
     return edges
 
-
-def lambda_handler(event, context):
-    start_node =str(event['start_node'])
+def parse_node_list(lst_start_node, q, edges):
     s_path = []
     pFlag = False
+    sPathList = {}
+    print(lst_start_node)
+    for sn in lst_start_node:
+        sPathList[sn] = {}
+        print(sn)
+        s_path, pFlag = get_shortest_path(sn, q, edges)
+        print(s_path)
+        print(pFlag)
+        sPathList[sn]["shortestPath"] = s_path
+        sPathList[sn]["actionCode"] = pFlag
+    print(sPathList) 
+    return sPathList
+
+
+def lambda_handler(event, context):
+    lst_snode = []
+    lst_snode =event['start_node_lst']
+    sPathLst = {}
 
     ################### Read from Edge Table ####################
     edges = get_map()
@@ -157,12 +173,7 @@ def lambda_handler(event, context):
             q[node,x]=0
             q[x,node]=0
     learn(0.5,0.8,0.8,g,q,r)
-    s_path, pFlag = get_shortest_path(start_node, q, edges)
-    if (pFlag == True):
-        return {
-            "shortestPath": s_path
-        }
-    else:
-        return {
-            "shortestPath": "Available path is blocked. Please wait for first responders to assist."
-        }
+    
+    sPathLst = parse_node_list(lst_snode, q, edges)
+    return sPathLst
+    
