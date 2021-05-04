@@ -166,12 +166,14 @@ def lambda_handler(event, context):
     lst_snode =event['start_node_lst']
     sPathLst = {}
     matrixSize = 40
+    roomW = []
 
     ################### Read from Edge Table ####################
     edges, roomW = get_map()
 
     #############################################################
 
+    matrixSize = matrixSize - len(roomW)
     g = nx.Graph()
     g.add_edges_from(edges)
     pos = nx.spring_layout(g)
