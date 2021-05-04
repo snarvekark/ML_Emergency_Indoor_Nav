@@ -63,7 +63,7 @@ def shortest_path(begin, end, q):
         return path, msg
 
 
-def get_shortest_path(origin_iot, q, edges):
+def get_shortest_path(origin_iot, q, edges, winRoom):
     map_names = {0:'R-A1',1:'R-A2',2:'R-B1',3:'R-C1', 4:'R-C2',5:'R-D1',6:'R-D2', 7:'R-E1', 8:'R-F1', 9:'R-G1', 10:'R-H1',
                11:'R-I1', 12:'R-M1', 13:'R-M2',14:'R-M3', 15:'R-N1',16:'W-1',17:'W-2', 18:'W-3', 19:'W-4', 20: 'W-5',
                21:'W-6', 22:'W-7', 23:'W-8', 24:'W-9', 25:'W-10', 26:'W-11', 27:'W-12', 28:'W-13', 29:'W-14', 30:'W-15',
@@ -73,6 +73,7 @@ def get_shortest_path(origin_iot, q, edges):
     pathFlag = False
     origin = 0
     keyExist = False
+    aCode = 1
     #print(origin_iot)
     for key, value in map_names.items():
         if origin_iot == value:
@@ -84,9 +85,18 @@ def get_shortest_path(origin_iot, q, edges):
     if (keyExist == True):
         spath, pathFlag = shortest_path(origin,31,q)
         if(pathFlag == True):
+            aCode = 0
             for n in spath:
                 res.append(map_names[n])
-    return res, pathFlag
+        else:
+            for i in winRoom:
+                if(i == origin):
+                    aCode = 2
+    else:
+        for i in winRoom:
+            if(i == origin):
+                aCode = 2
+    return res, aCode
 
 def get_map():
     url = "https://knaiab6xvbgbngi526537bslgu.appsync-api.us-east-1.amazonaws.com/graphql"
@@ -120,6 +130,7 @@ def get_map():
     edgesDb = json.loads(response.text)['data']['getBuilding']['edges']['items']
     print(edgesDb)
     dict_edges = {}
+    windowRooms = []
     for d in edgesDb:
         if(d['isActive'] == False):
             dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
@@ -128,21 +139,24 @@ def get_map():
     revMapList = [(v, k) for k, v in dict_edges.items()]
     edges = mapList + revMapList
     print(edges)
-    return edges
+    for d in edgesDb:
+        if((d['isActive'] == True) & (d['canBeDeactivated'] == False)):
+            windowRooms.append(d['sourceIoT']['number'])
+    print("Window Rooms: {}".format(windowRooms))
+    return edges, windowRooms
 
-def parse_node_list(lst_start_node, q, edges):
+def parse_node_list(lst_start_node, q, edges, wRooms):
     s_path = []
-    pFlag = False
     sPathList = {}
     print(lst_start_node)
     for sn in lst_start_node:
         sPathList[sn] = {}
         print(sn)
-        s_path, pFlag = get_shortest_path(sn, q, edges)
+        s_path, actCode = get_shortest_path(sn, q, edges, wRooms)
         print(s_path)
-        print(pFlag)
         sPathList[sn]["shortestPath"] = s_path
-        sPathList[sn]["actionCode"] = pFlag
+        sPathList[sn]["actionCode"] = actCode
+        
     print(sPathList) 
     return sPathList
 
@@ -151,9 +165,10 @@ def lambda_handler(event, context):
     lst_snode = []
     lst_snode =event['start_node_lst']
     sPathLst = {}
+    matrixSize = 40
 
     ################### Read from Edge Table ####################
-    edges = get_map()
+    edges, roomW = get_map()
 
     #############################################################
 
@@ -174,6 +189,6 @@ def lambda_handler(event, context):
             q[x,node]=0
     learn(0.5,0.8,0.8,g,q,r)
     
-    sPathLst = parse_node_list(lst_snode, q, edges)
+    sPathLst = parse_node_list(lst_snode, q, edges, roomW)
     return sPathLst
     
