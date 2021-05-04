@@ -79,6 +79,27 @@ def get_shortest_path(origin_iot, q, edges, winRoom):
         if origin_iot == value:
             origin = key
     #print(origin)
+    # for key, value in edges:
+    #     if key == origin:
+    #         keyExist = True
+    # if (keyExist == True):
+    #     spath, pathFlag = shortest_path(origin,31,q)
+    #     if(pathFlag == True):
+    #         aCode = 0
+    #         for n in spath:
+    #             res.append(map_names[n])
+    #     else:
+    #         for i in winRoom:
+    #             if(i == origin):
+    #                 aCode = 2
+    # else:
+    #     for i in winRoom:
+    #         if(i == origin):
+    #             aCode = 2
+    for i in winRoom:
+        if(i == origin):
+            aCode = 2
+            return res, aCode
     for key, value in edges:
         if key == origin:
             keyExist = True
@@ -89,14 +110,8 @@ def get_shortest_path(origin_iot, q, edges, winRoom):
             for n in spath:
                 res.append(map_names[n])
         else:
-            for i in winRoom:
-                if(i == origin):
-                    aCode = 2
-    else:
-        for i in winRoom:
-            if(i == origin):
-                aCode = 2
-    return res, aCode
+            aCode = 1
+    return res, aCode  
 
 def get_map():
     url = "https://knaiab6xvbgbngi526537bslgu.appsync-api.us-east-1.amazonaws.com/graphql"
@@ -134,15 +149,17 @@ def get_map():
     for d in edgesDb:
         if(d['isActive'] == False):
             dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
+    for d in edgesDb:
+        if((d['isActive'] == True) & (d['canBeDeactivated'] == False)):
+            windowRooms.append(d['sourceIoT']['number'])
+            dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
+    print("Window Rooms: {}".format(windowRooms))
     print(dict_edges)
     mapList = [(k, v) for k, v in dict_edges.items()]
     revMapList = [(v, k) for k, v in dict_edges.items()]
     edges = mapList + revMapList
     print(edges)
-    for d in edgesDb:
-        if((d['isActive'] == True) & (d['canBeDeactivated'] == False)):
-            windowRooms.append(d['sourceIoT']['number'])
-    print("Window Rooms: {}".format(windowRooms))
+    
     return edges, windowRooms
 
 def parse_node_list(lst_start_node, q, edges, wRooms):
@@ -165,15 +182,13 @@ def lambda_handler(event, context):
     lst_snode = []
     lst_snode =event['start_node_lst']
     sPathLst = {}
-    matrixSize = 40
     roomW = []
 
     ################### Read from Edge Table ####################
     edges, roomW = get_map()
 
     #############################################################
-
-    matrixSize = matrixSize - len(roomW)
+    
     g = nx.Graph()
     g.add_edges_from(edges)
     pos = nx.spring_layout(g)
