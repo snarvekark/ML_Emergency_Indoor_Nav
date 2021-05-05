@@ -63,7 +63,7 @@ def shortest_path(begin, end, q):
         return path, msg
 
 
-def get_shortest_path(origin_iot, q, edges, winRoom):
+def get_shortest_path(origin_iot, q, edges, winRoom, wlkW, cRms):
     map_names = {0:'R-A1',1:'R-A2',2:'R-B1',3:'R-C1', 4:'R-C2',5:'R-D1',6:'R-D2', 7:'R-E1', 8:'R-F1', 9:'R-G1', 10:'R-H1',
                11:'R-I1', 12:'R-M1', 13:'R-M2',14:'R-M3', 15:'R-N1',16:'W-1',17:'W-2', 18:'W-3', 19:'W-4', 20: 'W-5',
                21:'W-6', 22:'W-7', 23:'W-8', 24:'W-9', 25:'W-10', 26:'W-11', 27:'W-12', 28:'W-13', 29:'W-14', 30:'W-15',
@@ -79,23 +79,7 @@ def get_shortest_path(origin_iot, q, edges, winRoom):
         if origin_iot == value:
             origin = key
     #print(origin)
-    # for key, value in edges:
-    #     if key == origin:
-    #         keyExist = True
-    # if (keyExist == True):
-    #     spath, pathFlag = shortest_path(origin,31,q)
-    #     if(pathFlag == True):
-    #         aCode = 0
-    #         for n in spath:
-    #             res.append(map_names[n])
-    #     else:
-    #         for i in winRoom:
-    #             if(i == origin):
-    #                 aCode = 2
-    # else:
-    #     for i in winRoom:
-    #         if(i == origin):
-    #             aCode = 2
+   
     for i in winRoom:
         if(i == origin):
             aCode = 2
@@ -110,7 +94,10 @@ def get_shortest_path(origin_iot, q, edges, winRoom):
             for n in spath:
                 res.append(map_names[n])
         else:
-            aCode = 1
+            if(origin in cRms):
+                aCode = 2
+            else:
+                aCode = 1
     return res, aCode  
 
 def get_map():
@@ -141,35 +128,50 @@ def get_map():
     'Content-Type': 'application/json'
     }
 
+    map_names = {0:'R-A1',1:'R-A2',2:'R-B1',3:'R-C1', 4:'R-C2',5:'R-D1',6:'R-D2', 7:'R-E1', 8:'R-F1', 9:'R-G1', 10:'R-H1',
+               11:'R-I1', 12:'R-M1', 13:'R-M2',14:'R-M3', 15:'R-N1',16:'W-1',17:'W-2', 18:'W-3', 19:'W-4', 20: 'W-5',
+               21:'W-6', 22:'W-7', 23:'W-8', 24:'W-9', 25:'W-10', 26:'W-11', 27:'W-12', 28:'W-13', 29:'W-14', 30:'W-15',
+               31:'W-16', 32:'W-17', 33:'W-18', 34:'W-19', 35:'W-20', 36:'W-21', 37:'W-22', 38:'R-B2',39:'W-23'}
+    wWays = []
     response = requests.request("POST", url, headers=headers, data=payload)
     edgesDb = json.loads(response.text)['data']['getBuilding']['edges']['items']
     print(edgesDb)
     dict_edges = {}
     windowRooms = []
+    cRooms = []
+    for k,v in map_names.items():
+        if v.startswith('W'):
+            wWays.append(k)
+    print(wWays)
     for d in edgesDb:
         if(d['isActive'] == False):
             dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
     for d in edgesDb:
         if((d['isActive'] == True) & (d['canBeDeactivated'] == False)):
-            windowRooms.append(d['sourceIoT']['number'])
-            dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
+            if(d['sourceIoT']['number'] not in wWays):
+                windowRooms.append(d['sourceIoT']['number'])
+                dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
     print("Window Rooms: {}".format(windowRooms))
+    for d in edgesDb:
+        if(d['canBeDeactivated'] == False):
+            if(d['sourceIoT']['number'] not in wWays):
+                cRooms.append(d['sourceIoT']['number'])   
     print(dict_edges)
     mapList = [(k, v) for k, v in dict_edges.items()]
     revMapList = [(v, k) for k, v in dict_edges.items()]
     edges = mapList + revMapList
     print(edges)
     
-    return edges, windowRooms
+    return edges, windowRooms, wWays, cRooms
 
-def parse_node_list(lst_start_node, q, edges, wRooms):
+def parse_node_list(lst_start_node, q, edges, wRooms, wwy, crms):
     s_path = []
     sPathList = {}
     print(lst_start_node)
     for sn in lst_start_node:
         sPathList[sn] = {}
         print(sn)
-        s_path, actCode = get_shortest_path(sn, q, edges, wRooms)
+        s_path, actCode = get_shortest_path(sn, q, edges, wRooms, wwy, crms)
         print(s_path)
         sPathList[sn]["shortestPath"] = s_path
         sPathList[sn]["actionCode"] = actCode
@@ -185,7 +187,7 @@ def lambda_handler(event, context):
     roomW = []
 
     ################### Read from Edge Table ####################
-    edges, roomW = get_map()
+    edges, roomW, ww, roomsC = get_map()
 
     #############################################################
     
@@ -206,6 +208,6 @@ def lambda_handler(event, context):
             q[x,node]=0
     learn(0.5,0.8,0.8,g,q,r)
     
-    sPathLst = parse_node_list(lst_snode, q, edges, roomW)
+    sPathLst = parse_node_list(lst_snode, q, edges, roomW, ww, roomsC)
     return sPathLst
     
