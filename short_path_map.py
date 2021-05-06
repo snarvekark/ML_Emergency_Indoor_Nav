@@ -116,6 +116,7 @@ def get_map():
                         }
                         isActive
                         canBeDeactivated
+                        hasWindows
                     }
                 }
             }
@@ -147,15 +148,14 @@ def get_map():
         if(d['isActive'] == False):
             dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
     for d in edgesDb:
-        if((d['isActive'] == True) & (d['canBeDeactivated'] == False)):
-            if(d['sourceIoT']['number'] not in wWays):
+        if(d['isActive'] == True):
+            if(d['hasWindows'] == True):
                 windowRooms.append(d['sourceIoT']['number'])
                 dict_edges[d['sourceIoT']['number']] = d['destinationIoT']['number']
     print("Window Rooms: {}".format(windowRooms))
     for d in edgesDb:
-        if(d['canBeDeactivated'] == False):
-            if(d['sourceIoT']['number'] not in wWays):
-                cRooms.append(d['sourceIoT']['number'])   
+        if(d['hasWindows'] == True):
+            cRooms.append(d['sourceIoT']['number'])   
     print(dict_edges)
     mapList = [(k, v) for k, v in dict_edges.items()]
     revMapList = [(v, k) for k, v in dict_edges.items()]
